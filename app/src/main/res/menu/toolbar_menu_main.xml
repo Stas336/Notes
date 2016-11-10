@@ -1,0 +1,33 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:sabd="http://schemas.android.com/apk/res-auto"
+    xmlns:app="http://schemas.android.com/tools">
+
+    <item
+        android:id="@+id/action_add"
+        android:icon="@drawable/ic_note_add_white_36dp"
+        android:orderInCategory="100"
+        android:title="Add"
+        sabd:showAsAction="always"/>
+
+    <item
+        android:id="@+id/action_search"
+        android:icon="@drawable/ic_search_white_36dp"
+        android:orderInCategory="100"
+        android:title="Search"
+        sabd:showAsAction="always"/>
+
+    <item
+        android:id="@+id/action_settings"
+        android:orderInCategory="100"
+        android:title="Settings"
+        app:showAsAction="never"
+        android:visible="true"/>
+
+    <item
+        android:id="@+id/action_exit"
+        android:orderInCategory="100"
+        android:title="Exit"
+        app:showAsAction="never"
+        android:visible="true"/>
+
+</menu>
