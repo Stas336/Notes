@@ -1,8 +1,8 @@
 package com.stasl.notes;
 
-import android.app.FragmentTransaction;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
@@ -21,18 +21,20 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
+    final String TAG = BuildConfig.APPLICATION_ID;
     AddNoteFragment addNoteFragment;
     MainMenuFragment mainMenuFragment;
-    FragmentTransaction fragmentTransaction;
+    FragmentControllerImpl fragmentController;
     MenuInflater drawerMenuInflater;
     DrawerLayout drawerLayout;
     Menu drawerMenu;
     ListView listView;
     Toolbar toolbar;
     DataBase dbhelper;
-    Boolean isPrevious = false;
-    int previousID = 0;
+    Boolean isAlreadyCreated = false;
+    int currentID = -1;
     SQLiteDatabase db;
+    List<Integer> notesID;
 
     @Override
     protected void onCreate(Bundle savedInstanceState)
@@ -43,6 +45,8 @@ public class MainActivity extends AppCompatActivity {
         drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED); //TEMPORARY
         toolbar = (Toolbar) findViewById(R.id.toolbar);
         listView = (ListView) findViewById(R.id.listToolbarMenu);
+        notesID = new ArrayList<>();
+        fragmentController = new FragmentControllerImpl(this);
         addNoteFragment = new AddNoteFragment();
         mainMenuFragment = new MainMenuFragment();
         toolbar.showOverflowMenu();
@@ -55,50 +59,63 @@ public class MainActivity extends AppCompatActivity {
     protected void onStart()
     {
         super.onStart();
-        fragmentTransaction = getFragmentManager().beginTransaction();
-        fragmentTransaction.add(R.id.fragmentContainer, mainMenuFragment);
-        fragmentTransaction.commit();
-        getFragmentManager().executePendingTransactions();
+        fragmentController.addFragment(R.id.fragmentContainer, mainMenuFragment);
         showNotes();
     }
 
-    public void saveNote()
+    public void saveNewNote()
     {
         ContentValues cv = new ContentValues();
         String user_text = addNoteFragment.text.getText().toString();
-        Log.d(BuildConfig.APPLICATION_ID, "Inserting text in table");
+        Log.d(TAG, "Inserting text in table");
         cv.put("note", user_text);
         long rowID = db.insert("notes", null, cv);
-        Log.d(BuildConfig.APPLICATION_ID, "row inserted, ID = " + rowID);
+        Log.d(TAG, "row inserted, ID = " + rowID);
+        clearTextField();
     }
 
-    public void savePreviousNote(int id)
+    public void saveAlreadyCreatedNote()
     {
         ContentValues cv = new ContentValues();
         String user_text = addNoteFragment.text.getText().toString();
         cv.put("note", user_text);
-        Log.d(BuildConfig.APPLICATION_ID, "Updating text in table");
+        Log.d(TAG, "Updating text in table");
         try
         {
-            db.update("notes", cv, "id = ?", new String[] {String.valueOf(id + 1)});
+            db.update("notes", cv, "id = ?", new String[] {String.valueOf(notesID.get(currentID))});
         }catch (Exception ex)
         {
-            Log.d(BuildConfig.APPLICATION_ID, ex.getMessage());
+            Log.d(TAG, ex.getMessage());
         }
-        Log.d(BuildConfig.APPLICATION_ID, "row updated, ID = " + id);
-        isPrevious = false;
+        Log.d(TAG, "row updated, ID = " + currentID);
+        currentID = -1;
+        isAlreadyCreated = false;
+        clearTextField();
+    }
+
+    public void clearTextField()
+    {
+        addNoteFragment.text.setText("");
+    }
+
+    public void changeDrawerLayoutMenu(int menuResource)
+    {
+        drawerMenu.clear();
+        drawerMenuInflater.inflate(menuResource, drawerMenu);
     }
 
     public void showNotes()
     {
         Cursor c = db.query("notes", null, null, null, null, null, null);
         List<String> notes = new ArrayList<>();
+        List<Integer> notesIDNew = new ArrayList<>();
         if (c.moveToFirst())
         {
             int idColIndex = c.getColumnIndex("id");
             int textColIndex = c.getColumnIndex("note");
             do
             {
+                notesIDNew.add(c.getInt(idColIndex));
                 notes.add(c.getString(textColIndex));
             } while (c.moveToNext());
         }
@@ -107,20 +124,17 @@ public class MainActivity extends AppCompatActivity {
             notes.add("There are no notes");
         }
         c.close();
+        notesID = notesIDNew;
         mainMenuFragment.updateList(notes);
     }
 
     public void editNote(String previous_text, int id)
     {
-        isPrevious = true;
-        previousID = id;
-        fragmentTransaction = getFragmentManager().beginTransaction();
-        fragmentTransaction.replace(R.id.fragmentContainer, addNoteFragment);
-        fragmentTransaction.commit();
-        getFragmentManager().executePendingTransactions();
-        drawerMenu.clear();
+        isAlreadyCreated = true;
+        currentID = id;
+        fragmentController.changeFragment(R.id.fragmentContainer, addNoteFragment);
         addNoteFragment.text.setText(previous_text);
-        drawerMenuInflater.inflate(R.menu.toolbar_menu_note, drawerMenu);
+        changeDrawerLayoutMenu(R.menu.toolbar_menu_note);
     }
 
     @Override
@@ -144,34 +158,39 @@ public class MainActivity extends AppCompatActivity {
         }
         else if (id == R.id.action_save)
         {
-            if (isPrevious.equals(true))
+            if (isAlreadyCreated.equals(true))
             {
-                savePreviousNote(previousID);
+                saveAlreadyCreatedNote();
             }
             else
             {
-                saveNote();
+                saveNewNote();
             }
-            fragmentTransaction = getFragmentManager().beginTransaction();
-            fragmentTransaction.replace(R.id.fragmentContainer, mainMenuFragment);
-            fragmentTransaction.commit();
-            getFragmentManager().executePendingTransactions();
-            drawerMenu.clear();
-            drawerMenuInflater.inflate(R.menu.toolbar_menu_main, drawerMenu);
+            fragmentController.changeFragment(R.id.fragmentContainer, mainMenuFragment);
+            changeDrawerLayoutMenu(R.menu.toolbar_menu_main);
             showNotes();
         }
         else if (id == R.id.action_delete)
         {
-            db.delete("notesDB", "where id == ", null);
+            if (currentID != -1)
+            {
+                Log.d(TAG, "ID is " + notesID.get(currentID));
+                db.delete("notes", "id = ?", new String[]{String.valueOf(notesID.get(currentID))});
+                Log.d(TAG, "Deleted value with id = " + notesID.get(currentID));
+                notesID.clear();
+                currentID = -1;
+                isAlreadyCreated = false;
+                clearTextField();
+            }
+            fragmentController.changeFragment(R.id.fragmentContainer, mainMenuFragment);
+            drawerMenu.clear();
+            drawerMenuInflater.inflate(R.menu.toolbar_menu_main, drawerMenu);
+            showNotes();
         }
         else if (id == R.id.action_add)
         {
-            fragmentTransaction = getFragmentManager().beginTransaction();
-            fragmentTransaction.replace(R.id.fragmentContainer, addNoteFragment);
-            fragmentTransaction.commit();
-            getFragmentManager().executePendingTransactions();
-            drawerMenu.clear();
-            drawerMenuInflater.inflate(R.menu.toolbar_menu_note, drawerMenu);
+            fragmentController.changeFragment(R.id.fragmentContainer, addNoteFragment);
+            changeDrawerLayoutMenu(R.menu.toolbar_menu_note);
         }
         else if (id == R.id.action_search)
         {
@@ -192,7 +211,7 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onCreate(SQLiteDatabase db) {
-            Log.d(BuildConfig.APPLICATION_ID , "Creating database");
+            Log.d(TAG , "Creating database");
             db.execSQL("create table notes (id integer primary key autoincrement, note text);");
         }
 

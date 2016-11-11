@@ -2,6 +2,7 @@ package com.stasl.notes;
 
 import android.app.Fragment;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -24,6 +25,8 @@ public class MainMenuFragment extends Fragment
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int i, long l)
             {
+                int index = i + 1;
+                Log.d(BuildConfig.APPLICATION_ID, "Selected item with id = " + index);
                 ((MainActivity)getActivity()).editNote(listNotes.getItemAtPosition(i).toString(), i);
             }
         });
